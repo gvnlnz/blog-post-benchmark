@@ -231,10 +231,3 @@ quality of different models' clustering decisions during the benchmark run.
 Instead, it evaluates the final blog-post writing stage under controlled
 conditions. This is intentional: the goal is to compare generated Italian blog
 post quality while holding the input constant.
-
-## Repository Description
-
-Short description for GitHub:
-
-```text
-```
