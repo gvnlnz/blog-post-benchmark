@@ -1,0 +1,31 @@
+# --- Generation ---
+# Ollama run natively (not in Docker container) so it uses M4 GPU.
+# the QUALITY metrics are identical to production (same model = same text).
+ollama_base_url: "http://localhost:11434/v1"
+ollama_host: "http://localhost:11434"
+temperature: 0.3   # same used in production LLM
+
+# --- Models ---
+models:
+  - "gemma3:4b"
+  - "qwen2.5:14b"
+
+# --- Dataset ---
+# A JSON list of {"items": [{"cluster_topic","article":{title,summary,categories}}]}.
+dataset: "data/clusters.json"
+output_dir: "results"
+
+# --- Deterministic grammar check (LanguageTool (Java)) ---
+grammar: true
+grammar_lang: "it"
+
+# --- LLM-as-judge ---
+# OpenAI-compatible API. Examples:
+#   Gemini (free tier): base_url below, model "gemini-2.0-flash", api_key_env GEMINI_API_KEY
+#   OpenAI:  base_url "https://api.openai.com/v1", model "gpt-4o", api_key_env OPENAI_API_KEY
+#   Local:   base_url "http://localhost:11434/v1", model "qwen2.5:14b" (different from tested ones)
+judge:
+  enabled: true
+  base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  model: "gemini-2.5-flash"
+  api_key_env: "GEMINI_API_KEY"

@@ -1,0 +1,6 @@
+openai>=1.30
+language-tool-python>=2.8
+pyyaml>=6.0
+requests>=2.31
+pymysql>=1.1
+python-dotenv>=1.0

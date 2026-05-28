@@ -1,0 +1,94 @@
+"""Replicates Lingotto's write-digest -> fix -> translate pipeline for one model.
+
+This standalone benchmark vendors the production Lingotto prompts in
+lingotto_prompts.py so it can be published and run outside the main project.
+Talks to an OpenAI-compatible endpoint (native Ollama on Metal by default).
+"""
+import json
+import time
+
+from openai import OpenAI
+
+import lingotto_prompts as P
+from lingotto_helper import missing_fields
+
+
+class DigestGenerator:
+    def __init__(self, base_url: str, api_key: str = "ollama", temperature: float = 0.3):
+        self.client = OpenAI(base_url=base_url, api_key=api_key)
+        self.temperature = temperature
+
+    def _chat(self, model: str, system: str, user_obj) -> str:
+        resp = self.client.chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            temperature=self.temperature,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user_obj, ensure_ascii=False)},
+            ],
+        )
+        return resp.choices[0].message.content or ""
+
+    def warmup(self, model: str) -> None:
+        """Load the model into memory so timed runs exclude cold-start."""
+        try:
+            self.client.chat.completions.create(
+                model=model,
+                max_tokens=1,
+                messages=[{"role": "user", "content": "ok"}],
+            )
+        except Exception:
+            pass
+
+    def generate(self, model: str, items: list[dict]) -> dict:
+        """Run the full pipeline (write -> fix-if-needed -> translate).
+
+        Returns the final Italian post, the English intermediate, and diagnostics
+        (latency, whether the repair step fired, first-pass validity, errors).
+        """
+        t0 = time.perf_counter()
+        diag = {"model": model, "repaired": False, "first_pass_valid": False, "error": None}
+
+        # 1) write digest (English)
+        raw = self._chat(model, P.BLOG_DIGEST_PROMPT, {"items": items})
+        try:
+            post = json.loads(raw)
+        except json.JSONDecodeError:
+            diag.update(error="write step: invalid JSON", latency_s=time.perf_counter() - t0)
+            return {"post": None, "post_en": None, "diag": diag}
+
+        diag["first_pass_valid"] = not missing_fields(post)
+
+        # 2) repair missing fields (mirrors service.write_digest)
+        if missing_fields(post):
+            diag["repaired"] = True
+            articles = [it["article"] for it in items]
+            fixed = self._chat(model, P.FIX_PROMPT, {
+                "partial_post": post,
+                "cluster": {"cluster_topic": "daily digest", "articles": articles},
+            })
+            try:
+                post = json.loads(fixed)
+            except json.JSONDecodeError:
+                diag.update(error="fix step: invalid JSON", latency_s=time.perf_counter() - t0)
+                return {"post": None, "post_en": None, "diag": diag}
+            if missing_fields(post):
+                diag["error"] = "still missing fields after repair"
+
+        post_en = dict(post)
+
+        # 3) translate to Italian
+        translated = self._chat(model, P.BLOG_TO_IT, post)
+        try:
+            post_it = json.loads(translated)
+        except json.JSONDecodeError:
+            diag.update(error="translate step: invalid JSON", latency_s=time.perf_counter() - t0)
+            return {"post": None, "post_en": post_en, "diag": diag}
+
+        diag["final_valid"] = not missing_fields(post_it)
+        if missing_fields(post_it):
+            diag["error"] = "translation step: missing required fields"
+
+        diag["latency_s"] = time.perf_counter() - t0
+        return {"post": post_it, "post_en": post_en, "diag": diag}
