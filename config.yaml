@@ -8,7 +8,7 @@ temperature: 0.3   # same used in production LLM
 # --- Models ---
 models:
   - "gemma3:4b"
-  - "qwen2.5:14b"
+  - "qwen2.5:7b"
 
 # --- Dataset ---
 # A JSON list of {"items": [{"cluster_topic","article":{title,summary,categories}}]}.
@@ -20,12 +20,10 @@ grammar: true
 grammar_lang: "it"
 
 # --- LLM-as-judge ---
-# OpenAI-compatible API. Examples:
-#   Gemini (free tier): base_url below, model "gemini-2.0-flash", api_key_env GEMINI_API_KEY
-#   OpenAI:  base_url "https://api.openai.com/v1", model "gpt-4o", api_key_env OPENAI_API_KEY
-#   Local:   base_url "http://localhost:11434/v1", model "qwen2.5:14b" (different from tested ones)
+# OpenAI-compatible API. Local judge avoids external billing/quota issues.
+# Keep the judge different from the tested models to avoid self-judging.
 judge:
   enabled: true
-  base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
-  model: "gemini-2.5-flash"
-  api_key_env: "GEMINI_API_KEY"
+  base_url: "http://localhost:11434/v1"
+  model: "qwen2.5:14b"
+  api_key: "ollama"
