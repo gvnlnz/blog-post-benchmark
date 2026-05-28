@@ -1,7 +1,7 @@
 # Blog Post Generation Benchmark
 
-Benchmark for evaluating local and API-hosted LLMs on the final writing stage of
-an automated financial blog-post pipeline.
+Benchmark for evaluating local LLMs on the final writing stage of an automated
+financial blog-post pipeline.
 
 The benchmark focuses on the text that a reader actually sees: the Italian
 `body` of a generated blog post. Given a fixed dataset of clustered financial
@@ -14,6 +14,12 @@ write digest -> repair JSON if needed -> translate to Italian
 It then produces a compact `model x metrics` table with readability, grammar,
 faithfulness, editorial quality, coherence, structural validity and performance
 statistics.
+
+Current benchmark setup:
+
+- generation models: `gemma3:4b`, `qwen2.5:7b`
+- judge model: `qwen2.5:14b`
+- runtime: Ollama local API
 
 ## Why This Exists
 
@@ -81,14 +87,16 @@ Latency and RAM are useful as operational metrics.
 ```text
 ├── config.yaml               # main benchmark configuration
 ├── requirements.txt
+├── results/
 ├── data/
-│   ├── clusters.json         # frozen benchmark dataset
+│   └── clusters.json         # frozen benchmark dataset
 ├── generate.py               # write -> repair -> translate generation logic
 ├── inspect_dataset.py        # quick dataset size/count check
 ├── judge.py                  # LLM-as-judge scoring
 ├── lingotto_helper.py        # vendored schema validation helper
 ├── lingotto_prompts.py       # vendored production prompts
 ├── metrics.py                # deterministic text metrics
+├── results.md                # cleaned-result analysis
 ├── run.py                    # benchmark orchestrator
 └── smoke.yaml                # quick plumbing test configuration
 ```
@@ -96,9 +104,8 @@ Latency and RAM are useful as operational metrics.
 ## Requirements (using Homebrew)
 
 - Python 3.11 or newer
-- Ollama, if benchmarking local models
+- Ollama
 - Java, only if using LanguageTool grammar checks
-- Optional API key for an external judge model such as Gemini or OpenAI
 
 Install Python dependencies:
 
@@ -114,6 +121,7 @@ Install and start Ollama:
 brew install ollama
 ollama serve
 ollama pull gemma3:4b
+ollama pull qwen2.5:7b
 ollama pull qwen2.5:14b
 ```
 
@@ -128,24 +136,12 @@ If Java is not available, set `grammar: false` in `config.yaml`.
 
 ## Configuration
 
-Copy the example environment file if you need API keys or DB credentials:
-
-```bash
-cp .env.example .env
-```
-
-For Gemini judge scoring:
-
-```env
-GEMINI_API_KEY=your_key_here
-```
-
 Select models and options in `config.yaml`:
 
 ```yaml
 models:
   - "gemma3:4b"
-  - "qwen2.5:14b"
+  - "qwen2.5:7b"
 
 dataset: "data/clusters.json"
 output_dir: "results"
@@ -153,13 +149,14 @@ grammar: true
 
 judge:
   enabled: true
-  base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
-  model: "gemini-2.5-flash"
-  api_key_env: "GEMINI_API_KEY"
+  base_url: "http://localhost:11434/v1"
+  model: "qwen2.5:14b"
+  api_key: "ollama"
 ```
 
 The judge should be independent from the models being evaluated. Avoid letting a
-model judge its own output.
+model judge its own output. In the default configuration, `qwen2.5:14b` is used
+only as judge, while the evaluated models are `gemma3:4b` and `qwen2.5:7b`.
 
 ## Running The Benchmark
 
@@ -191,6 +188,20 @@ Outputs are written to `results/`:
 
 - `summary.csv`: mean metrics per model, ready for tables and reports.
 - `raw.jsonl`: every generated post with per-sample metrics for inspection.
+
+If failed generations or clear runtime outliers are manually removed from
+`raw.jsonl`, a cleaned summary can be produced and documented separately. 
+In the current analysis, the cleaned result file is:
+
+```text
+results/summary.csv
+```
+
+The interpretation of those cleaned results is documented in:
+
+```text
+results.md
+```
 
 ## Building A Dataset
 
