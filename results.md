@@ -1,151 +1,142 @@
 # Benchmark Results
 
-This document explains the benchmark metric and analyses `results/summary.csv` obtained after removing failed generations and one latency outlier.
+This document explains the benchmark metrics and compares two benchmark runs of the same Italian financial blog-post pipeline:
 
-The benchmark compares two local models: `gemma3:4b` and `qwen2.5:7b` on the generation of Italian financial blog posts. 
-Both models receive the same frozen dataset of clustered news items. 
-A separate local judge model, `qwen2.5:14b`, assigns qualitative scores.
+- **Local run** — generation models `gemma3:4b` and `qwen2.5:7b`, run via the Ollama local API on Apple Silicon, scored by a local judge `qwen2.5:14b`.
+- **Cloud run** — frontier generation models `anthropic/claude-opus-4.8` and `google/gemini-3.1-pro-preview`, run via OpenRouter, scored by an independent judge `meta-llama/llama-3.3-70b-instruct`.
+
+Both runs use the same frozen dataset of clustered news items and the same deterministic metrics. The cloud run is intended as a frontier **upper-bound reference** for the local results.
+
+> **Read the cross-run caveats (below) before comparing the two tables.** The
+> two runs use **different judges** and a slightly **different pipeline**, so
+> only the deterministic metrics (latency, validity, grammar, readability,
+> repetition, length) are directly comparable across runs. The judge scores are
+> comparable *within* a run, not *across* runs.
 
 ## Metric Meaning
 
 | Metric | Interval | Meaning in this benchmark |
 | --- | ---: | --- |
-| `n` | `[0, inf]` | Number of valid generated blog posts included in the final average. |
-| `latency_s` | `[0, inf]` | Average generation time per blog post, in seconds. Lower values indicate faster generation. |
-| `ram_mb` | `[0, inf]` | Approximate RAM footprint of the loaded Ollama model, in megabytes. Lower values indicate a lighter model. |
-| `first_pass_valid` | `[0, 1]` | Share of generations where the first English JSON output already contained all required fields. `1` means 100% valid. |
-| `final_valid` | `[0, 1]` | Share of final Italian outputs that still contained all required fields after translation. `1` means 100% valid. |
-| `repaired` | `[0, 1]` | Share of generations that required the repair step. Lower values are better; `0` means no repair was needed. |
-| `words` | `[0, inf]` | Average number of words in the final Italian blog-post body. This is descriptive, not directly better or worse. |
-| `grammar_err_per_100w` | `[0, inf]` | Average number of grammar or spelling errors per 100 words, measured with LanguageTool. Lower values are better. |
-| `gulpease` | `[0, 100]` | Italian readability index. Higher values indicate easier readability. Values around 40-60 indicate medium difficulty, typical for technical or financial prose. |
-| `repetition_3gram` | `[0, 1]` | Share of repeated three-word sequences. Lower values indicate less repetitive text. |
-| `faithfulness` | `[1, 5]` | Judge score for faithfulness to the source material. Higher values indicate fewer unsupported claims or hallucinations. |
-| `quality` | `[1, 5]` | Judge score for overall editorial quality: clarity, usefulness, structure and professional tone. |
-| `coherence` | `[1, 5]` | Judge score for logical flow and cohesion across the post. |
+| `n` | `[0, inf]` | Number of samples included in the average for that model. |
+| `latency_s` | `[0, inf]` | Average generation time per blog post, in seconds. Lower is faster. For local models this is pure compute; for cloud models it also includes network and provider queueing. |
+| `ram_mb` | `[0, inf]` | Approximate RAM footprint of the loaded Ollama model, in megabytes. Lower is lighter. Empty for cloud models (runs off-device). |
+| `first_pass_valid` | `[0, 1]` | Share of generations where the first English JSON output already contained all required fields. |
+| `final_valid` | `[0, 1]` | Share of final Italian outputs that still contained all required fields. `1` means 100% valid. |
+| `repaired` | `[0, 1]` | Share of generations that required the repair step. Lower is better. |
+| `proofread` | `[0, 1]` | Share of generations where the Italian proofreading step ran and produced a valid revised post. (Cloud run only — see caveats.) |
+| `words` | `[0, inf]` | Average number of words in the final Italian body. Descriptive, not directly better or worse. |
+| `grammar_err_per_100w` | `[0, inf]` | Average grammar/spelling errors per 100 words via LanguageTool. Lower is better. **Same tool across both runs, so directly comparable.** |
+| `gulpease` | `[0, 100]` | Italian readability index. Higher is easier; 40-60 is medium difficulty, typical for financial prose. |
+| `repetition_3gram` | `[0, 1]` | Share of repeated three-word sequences. Lower is less repetitive. |
+| `faithfulness` | `[1, 5]` | Judge score for source-groundedness / hallucination avoidance. |
+| `quality` | `[1, 5]` | Judge score for editorial quality: clarity, usefulness, structure, tone. |
+| `coherence` | `[1, 5]` | Judge score for logical flow and cohesion. |
 
 ## Summary
+
+### Local run — judge `qwen2.5:14b`
 
 | Model | n | Latency (s) | RAM (MB) | First valid | Final valid | Repaired | Words | Grammar err/100w | Gulpease | Repetition | Faithfulness | Quality | Coherence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `gemma3:4b` | 17 | 37.79 | 4311.4 | 1.00 | 1.00 | 0.00 | 268.41 | 1.81 | 47.18 | 0.05 | 4.12 | 4.76 | 4.94 |
 | `qwen2.5:7b` | 18 | 78.21 | 4924.2 | 1.00 | 1.00 | 0.00 | 289.83 | 2.15 | 45.10 | 0.06 | 4.00 | 4.78 | 4.89 |
 
+### Cloud run — judge `meta-llama/llama-3.3-70b-instruct`
+
+| Model | n | Latency (s) | RAM (MB) | First valid | Final valid | Repaired | Proofread | Words | Grammar err/100w | Gulpease | Repetition | Faithfulness | Quality | Coherence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `anthropic/claude-opus-4.8` | 19 | 32.13 | — | 1.00 | 1.00 | 0.00 | 1.00 | 293.84 | 0.99 | 47.76 | 0.05 | 5.00 | 4.42 | 5.00 |
+| `google/gemini-3.1-pro-preview` | 19 | 134.27 | — | 1.00 | 0.95 | 0.00 | 0.84 | 489.83 | 1.14 | 42.48 | 0.03 | 4.94 | 5.00 | 5.00 |
+
+## Cross-run caveats (read first)
+
+1. **Different judges.** The local posts were scored by `qwen2.5:14b`; the cloud
+   posts by `llama-3.3-70b-instruct`. The two judges have different scales and
+   severity, so the `faithfulness` / `quality` / `coherence` columns are **not
+   directly comparable between the two tables**. They are only meaningful for
+   ranking models *within the same run*.
+2. **Judge saturation on the cloud run.** A 70B judge is not clearly stronger
+   than the frontier generators it scores. It awards near-uniform top marks
+   (faithfulness 5.00 / 4.94, coherence 5.00 / 5.00), so it cannot finely
+   separate Opus from Gemini. Treat the cloud judge scores as a *floor of
+   adequacy* ("both are high quality"), not as a fine ranking.
+3. **Pipeline difference.** The cloud run includes the new fourth step
+   (Italian **proofread**) and the deterministic `normalize_metals()` pass; the
+   local run predates them (`write -> fix -> translate` only). Part of the
+   cloud grammar advantage therefore reflects the pipeline upgrade, not the
+   model alone.
+4. **Latency is not apples-to-apples.** Local latency is on-device compute;
+   cloud latency includes network round-trips and provider-side queueing.
+5. **Small samples.** `n` is 17-19 per model. Sub-point differences should not
+   be over-interpreted.
+
 ## Analysis
 
-### Reliability
+### Reliability and structural validity
 
-Both models achieve:
+All four models are essentially reliable. Both local models and Opus reach
+`first_pass_valid = 1.00`, `final_valid = 1.00`, `repaired = 0.00`. Gemini is the
+only model below a perfect score (`final_valid = 0.95`): one sample in nineteen
+produced output the lenient JSON parser still could not recover at the translate
+step (a long, likely-truncated reasoning response).
 
-```text
-first_pass_valid = 1.00
-final_valid = 1.00
-repaired = 0.00
-```
+### Grammar (the most comparable cross-run signal)
 
-On the set, this means both models always produced structurally valid JSON outputs and neither required the repair step. 
-From a pipeline reliability perspective, the two models are equivalent on the retained samples.
-
-### Performance
-
-`gemma3:4b` is substantially faster:
+LanguageTool is the same tool in both runs, so this is the cleanest comparison:
 
 ```text
-gemma3:4b  -> 37.79 seconds/post
-qwen2.5:7b -> 78.21 seconds/post
+gemma3:4b   -> 1.81 errors / 100w
+qwen2.5:7b  -> 2.15 errors / 100w
+Opus 4.8    -> 0.99 errors / 100w
+Gemini Pro  -> 1.14 errors / 100w
 ```
 
-`qwen2.5:7b` model takes a little more than twice as long on average. It also uses more memory:
-
-```text
-gemma3:4b  -> 4311.4 MB
-qwen2.5:7b -> 4924.2 MB
-```
-
-The difference is not extreme, but `gemma3:4b` is clearly lighter and faster in this setup.
-
-### Length
-
-`qwen2.5:7b` produces longer posts on average:
-
-```text
-gemma3:4b  -> 268.41 words
-qwen2.5:7b -> 289.83 words
-```
-
-This is not automatically positive or negative. Longer posts can provide more context, but they can also increase density and reduce readability if not well structured.
-
-### Grammar
-
-LanguageTool reports fewer grammar or spelling issues for `gemma3:4b`:
-
-```text
-gemma3:4b  -> 1.81 errors per 100 words
-qwen2.5:7b -> 2.15 errors per 100 words
-```
-
-Both values are relatively low, but `gemma3:4b` performs slightly better on this automatic linguistic metric.
+The cloud models roughly halve the local error rate. Some of this is the new
+proofread step, but the gap is large and consistent enough to also reflect
+genuinely stronger Italian from the frontier models.
 
 ### Readability
 
-Both models fall in the medium-difficulty Gulpease range:
-
 ```text
-gemma3:4b  -> 47.18
-qwen2.5:7b -> 45.10
+gemma3:4b   -> 47.18 Gulpease
+qwen2.5:7b  -> 45.10
+Opus 4.8    -> 47.76
+Gemini Pro  -> 42.48
 ```
 
-Since financial content naturally contains technical terms and dense sentences, values in the [40, 60] range are expected. 
-`gemma3:4b` is slightly more readable, but the difference is modest.
+All four sit in the expected 40-60 medium-difficulty band for financial prose.
+Opus is the most readable; Gemini the least, due to his writing much longer, denser posts.
 
-### Repetition
-
-Both models show low repetition:
+### Length
 
 ```text
-gemma3:4b  -> 0.05
-qwen2.5:7b -> 0.06
+gemma3:4b   -> 268.41 words
+qwen2.5:7b  -> 289.83
+Opus 4.8    -> 293.84
+Gemini Pro  -> 489.83
 ```
 
-The difference is negligible. Neither model appears strongly repetitive on this dataset.
+The local models and Opus cluster around ~270-294 words. Gemini stands out at
+~490 words, about 67% longer. Longer is not automatically better: it can add
+context but also reduce readability (its lower Gulpease) and likely inflates the
+judge's `quality` score for Gemini (LLM judges tend to reward verbosity).
 
-### Judge Scores
-
-The judge scores are very close:
+### Latency
 
 ```text
-faithfulness:
-gemma3:4b  -> 4.12 / 5
-qwen2.5:7b -> 4.00 / 5
-
-quality:
-gemma3:4b  -> 4.76 / 5
-qwen2.5:7b -> 4.78 / 5
-
-coherence:
-gemma3:4b  -> 4.94 / 5
-qwen2.5:7b -> 4.89 / 5
+Opus 4.8    -> 32.13 s   (cloud)
+gemma3:4b   -> 37.79 s   (local)
+qwen2.5:7b  -> 78.21 s   (local)
+Gemini Pro  -> 134.27 s  (cloud)
 ```
 
-Both models receive high qualitative scores. 
-`gemma3:4b` is slightly ahead in faithfulness and coherence, while `qwen2.5:7b` is marginally ahead in editorial quality. 
-These differences are small and should not be over interpreted.
+Notably, the fastest local model (`gemma3:4b`) is fast as Opus via API, while Gemini is by far the slowest, so a frontier model is not automatically faster.
 
-## Final personal judgment
+## Final judgment
 
-On this benchmark, both models are capable of generating valid and high quality Italian financial blog posts 
-from the same clustered input data. Their qualitative performance is very similar: both obtain high scores for faithfulness, 
-editorial quality and coherence.
+**Local run.** Both small local models produce valid, medium-high quality Italian posts from the same input. Their qualitative scores are very close. The decisive difference is efficiency: `gemma3:4b` is faster, lighter on RAM, slightly more readable and has fewer grammar errors than `qwen2.5:7b`, for no meaningful loss in judge-rated quality. For this pipeline, `gemma3:4b` is the better quality/cost trade-off; `qwen2.5:7b` is a valid alternative when slightly longer output is preferred and latency matters less.
 
-The main practical difference is the efficiency. 
-`gemma3:4b` is faster, uses less RAM, has slightly better readability and produces fewer grammar errors per 100 words. 
-`qwen2.5:7b` produces slightly longer posts and receives a marginally higher editorial quality score, 
-but the gain is minimal compared with the additional latency.
+**Cloud run.** Both frontier models are strong and reliable. Opus is the all-round operational pick: fastest, perfectly valid, fewest grammar errors, most readable, and concise. Gemini produces richer, longer posts with marginally lower repetition, but at ~4x the latency and with one unrecovered generation failure. The choice is a trade-off between Opus (concise, fast, robust) and Gemini (longer, more detailed), not a clear quality winner. The judge is too saturated to break the tie.
 
-For this specific pipeline and dataset, `gemma3:4b` appears to offer the better overall trade-off between quality and execution cost. 
-`qwen2.5:7b` remains a valid alternative when slightly longer outputs are preferred and latency is less important, 
-but the benchmark does not show a strong qualitative advantage that would clearly justify its higher runtime.
-
-The conclusion should be interpreted within the limits of the experiment: the dataset is small, 
-the judge is a local LLM, and the benchmark evaluates only the final writing stage rather than the entire 
-article-fetching and clustering pipeline.
+**Local vs cloud.** On the directly comparable deterministic metrics, the frontier cloud models clearly improve grammar (roughly half the error rate) and match or beat the local models on readability and validity, while the best local model is competitive on latency. 
+The cloud judge cannot quantify the qualitative gap, so the strongest defensible cross-run claim is the deterministic one: the frontier models write cleaner Italian, **but** a small local model like `gemma3:4b` is a remarkably close and far cheaper alternative for this constrained writing task.

@@ -1,43 +1,40 @@
 # Blog Post Generation Benchmark
 
-Benchmark for evaluating local LLMs on the final writing stage of an automated
-financial blog-post pipeline.
+Benchmark for evaluating LLMs on the final writing stage of an automated financial blog-post pipeline. 
+The generation backend is any OpenAI-compatible endpoint, so the same harness runs both **local models via Ollama** and **frontier cloud models via OpenRouter**.
 
-The benchmark focuses on the text that a reader actually sees: the Italian
-`body` of a generated blog post. Given a fixed dataset of clustered financial
-news items, each model runs the same production-inspired sequence:
+The benchmark focuses on the text that a reader actually sees: the Italian `body` of a generated blog post. 
+Given a fixed dataset of clustered financial news items, each model runs the same production-inspired sequence:
 
 ```text
-write digest -> repair JSON if needed -> translate to Italian
+1. write digest
+2. repair JSON if needed
+3. translate to Italian
+4. proofread Italian
 ```
 
-It then produces a compact `model x metrics` table with readability, grammar,
-faithfulness, editorial quality, coherence, structural validity and performance
-statistics.
+The final **proofread** step is a native-Italian copy-edit pass that fixes only form (grammar, articulated prepositions, calques, anglicisms) and never touches content, sentiment, `impact_score` or `metals`. 
+After it, a deterministic `normalize_metals()` step canonicalizes the `metals` array (e.g. `oro -> gold`). All four LLM calls parse output with a lenient JSON reader that tolerates markdown fences and prose preambles (common with reasoning models), and fall back gracefully if a provider rejects the `response_format` JSON-mode hint.
 
-Current benchmark setup:
+It then produces a compact `model x metrics` table with readability, grammar, faithfulness, editorial quality, coherence, structural validity and performance statistics.
 
-- generation models: `gemma3:4b`, `qwen2.5:7b`
-- judge model: `qwen2.5:14b`
-- runtime: Ollama local API
+Two benchmark setups have been run:
+
+- **Local (Ollama):** generation models `gemma3:4b`, `qwen2.5:7b`; judge `qwen2.5:14b`; runtime. Ollama local API on an Apple Silicon machine.
+- **Cloud (OpenRouter):** generation models `anthropic/claude-opus-4.8`, `google/gemini-3 1-pro-preview`; judge `meta-llama/llama-3.3-70b-instruct`.
+
+The cloud run serves as a frontier upper-bound reference for the local results.
+Switch between the two by editing `config.yaml` (see *Configuration* below).
 
 ## Why This Exists
 
-The original system generates blog posts about precious metals from financial
-news articles. The complete pipeline fetches articles, clusters related news,
-selects the best article for each cluster, writes a digest, translates it into
-Italian and stores the final post.
+The original system generates blog posts about precious metals from financial news articles. The complete pipeline fetches articles, clusters related news, selects the best article for each cluster, writes a digest, translates it into Italian, proofreads it and stores the final post.
 
-For model selection and thesis reporting, this repository isolates the final
-writing stage. This keeps the benchmark controlled: every model receives the
-same frozen inputs, so differences in results are caused by writing quality and
-generation reliability, not by different clustering decisions.
+For model selection and thesis reporting, this repository isolates the final writing stage. This keeps the benchmark controlled: every model receives the same frozen inputs, so differences in results are caused by writing quality and generation reliability, not by different clustering decisions.
 
 ## What Is Evaluated
 
-Each top-level sample in `data/clusters.json` represents one blog post to
-generate. Inside a sample, each `item` is one cluster topic paired with its best
-source article.
+Each top-level sample in `data/clusters.json` represents one blog post to generate. Inside a sample, each `item` is one cluster topic paired with its best source article.
 
 Example shape:
 
@@ -58,8 +55,7 @@ Example shape:
 ]
 ```
 
-One sample generates one Italian blog post. Multiple cluster topics inside the
-same sample become sections/themes inside that post.
+One sample generates one Italian blog post. Multiple cluster topics inside the same sample become sections/themes inside that post.
 
 ## Metrics
 
@@ -74,13 +70,15 @@ same sample become sections/themes inside that post.
 | `first_pass_valid` | first English JSON output already had all required fields | higher is better |
 | `final_valid` | final Italian JSON output still has all required fields | higher is better |
 | `repaired` | repair step was needed after incomplete first output | lower is better |
+| `proofread` | Italian proofreading step ran and produced a valid revised post | higher is better |
 | `latency_s` | average generation time per post in seconds | lower is faster |
-| `ram_mb` | approximate loaded Ollama model footprint | lower is lighter |
+| `ram_mb` | approximate loaded Ollama model footprint (empty for cloud models) | lower is lighter |
 | `words` | average final Italian body length | descriptive |
 
 The main thesis-facing metrics are usually `gulpease`,
-`grammar_err_per_100w`, `faithfulness`, `quality`, `coherence` and `repaired`.
-Latency and RAM are useful as operational metrics.
+`grammar_err_per_100w`, `faithfulness`, `quality`, `coherence`, `repaired` and
+`proofread`. Latency and RAM are useful as operational metrics. `ram_mb` is only
+meaningful for local Ollama models and is left empty for cloud API models.
 
 ## Project Structure
 
@@ -88,15 +86,17 @@ Latency and RAM are useful as operational metrics.
 ├── config.yaml               # main benchmark configuration
 ├── requirements.txt
 ├── results/
+│   ├── api-models-summary.csv  # mean metrics per cloud model
+│   └── api-models-raw.jsonl    # every cloud-generated post + per-sample metrics
 ├── data/
 │   └── clusters.json         # frozen benchmark dataset
-├── generate.py               # write -> repair -> translate generation logic
+├── generate.py               # write -> repair -> translate -> proofread logic
 ├── inspect_dataset.py        # quick dataset size/count check
 ├── judge.py                  # LLM-as-judge scoring
-├── lingotto_helper.py        # vendored schema validation helper
-├── lingotto_prompts.py       # vendored production prompts
+├── lingotto_helper.py        # schema validation + metals normalization helper
+├── lingotto_prompts.py       # vendored production prompts (digest/fix/translate/proofread)
 ├── metrics.py                # deterministic text metrics
-├── results.md                # cleaned-result analysis
+├── results.md                # local-vs-cloud result analysis
 ├── run.py                    # benchmark orchestrator
 └── smoke.yaml                # quick plumbing test configuration
 ```
@@ -104,7 +104,8 @@ Latency and RAM are useful as operational metrics.
 ## Requirements (using Homebrew)
 
 - Python 3.11 or newer
-- Ollama
+- Ollama (only for the local-model setup)
+- An OpenRouter API key (only for the cloud-model setup)
 - Java, only if using LanguageTool grammar checks
 
 Install Python dependencies:
@@ -115,7 +116,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Install and start Ollama:
+For the **local** setup, install and start Ollama:
 
 ```bash
 brew install ollama
@@ -123,6 +124,12 @@ ollama serve
 ollama pull gemma3:4b
 ollama pull qwen2.5:7b
 ollama pull qwen2.5:14b
+```
+
+For the **cloud** setup, put your key in `.env` (see `.env.example`):
+
+```env
+OPENROUTER_API_KEY=sk-or-...
 ```
 
 Install Java for grammar scoring:
@@ -136,9 +143,39 @@ If Java is not available, set `grammar: false` in `config.yaml`.
 
 ## Configuration
 
-Select models and options in `config.yaml`:
+Select the backend, models and options in `config.yaml`.
+
+**Cloud setup (frontier reference, current default):**
 
 ```yaml
+gen_base_url: "https://openrouter.ai/api/v1"
+gen_api_key_env: "OPENROUTER_API_KEY"
+ollama_host: "http://localhost:11434"   # used only for RAM reporting
+temperature: 0.3
+
+models:
+  - "anthropic/claude-opus-4.8"
+  - "google/gemini-3.1-pro-preview"
+
+dataset: "data/clusters.json"
+output_dir: "results"
+grammar: true
+
+judge:
+  enabled: true
+  base_url: "https://openrouter.ai/api/v1"
+  model: "meta-llama/llama-3.3-70b-instruct"
+  api_key_env: "OPENROUTER_API_KEY"
+```
+
+**Local setup (Ollama):**
+
+```yaml
+gen_base_url: "http://localhost:11434/v1"
+# remove gen_api_key_env for local runs
+ollama_host: "http://localhost:11434"
+temperature: 0.3
+
 models:
   - "gemma3:4b"
   - "qwen2.5:7b"
@@ -154,9 +191,11 @@ judge:
   api_key: "ollama"
 ```
 
-The judge should be independent from the models being evaluated. Avoid letting a
-model judge its own output. In the default configuration, `qwen2.5:14b` is used
-only as judge, while the evaluated models are `gemma3:4b` and `qwen2.5:7b`.
+The judge should be independent from and, ideally, stronger than the models
+being evaluated, to avoid self-preference bias. Never let a model judge its own
+output. Note that a judge that is too weak relative to the generators saturates
+(it awards near-uniform top scores and can no longer rank them finely) — see
+`results.md` for how this affects the cloud comparison.
 
 ## Running The Benchmark
 
@@ -184,20 +223,22 @@ Run the full benchmark:
 python run.py
 ```
 
-Outputs are written to `results/`:
+Each run writes to `results/`:
 
 - `summary.csv`: mean metrics per model, ready for tables and reports.
 - `raw.jsonl`: every generated post with per-sample metrics for inspection.
 
-If failed generations or clear runtime outliers are manually removed from
-`raw.jsonl`, a cleaned summary can be produced and documented separately. 
-In the current analysis, the cleaned result file is:
+`summary.csv` is rebuilt from `raw.jsonl` (mean per model over the numeric
+metrics; `n` counts all rows for the model). The committed cloud-run outputs
+are kept under stable names so a later local run does not overwrite them:
 
 ```text
-results/summary.csv
+results/api-models-summary.csv
+results/api-models-raw.jsonl
 ```
 
-The interpretation of those cleaned results is documented in:
+The interpretation of the results, comparing the local and cloud runs, is
+documented in:
 
 ```text
 results.md
