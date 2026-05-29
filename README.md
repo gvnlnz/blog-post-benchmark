@@ -1,7 +1,7 @@
 # Blog Post Generation Benchmark
 
 Benchmark for evaluating LLMs on the final writing stage of an automated financial blog-post pipeline. 
-The generation backend is any OpenAI-compatible endpoint, so the same harness runs both **local models via Ollama** and **frontier cloud models via OpenRouter**.
+The generation backend is an OpenAI-compatible endpoint, so the same harness runs both **local models via Ollama** and **frontier cloud models via OpenRouter**.
 
 The benchmark focuses on the text that a reader actually sees: the Italian `body` of a generated blog post. 
 Given a fixed dataset of clustered financial news items, each model runs the same production-inspired sequence:
