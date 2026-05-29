@@ -10,7 +10,7 @@ import time
 from openai import OpenAI
 
 import lingotto_prompts as P
-from lingotto_helper import missing_fields
+from lingotto_helper import missing_fields, normalize_metals
 
 
 class DigestGenerator:
@@ -19,15 +19,20 @@ class DigestGenerator:
         self.temperature = temperature
 
     def _chat(self, model: str, system: str, user_obj) -> str:
-        resp = self.client.chat.completions.create(
+        kwargs = dict(
             model=model,
-            response_format={"type": "json_object"},
             temperature=self.temperature,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(user_obj, ensure_ascii=False)},
             ],
         )
+        try:
+            resp = self.client.chat.completions.create(
+                response_format={"type": "json_object"}, **kwargs)
+        except Exception:
+            # some providers/models reject response_format; retry without it
+            resp = self.client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content or ""
 
     def warmup(self, model: str) -> None:
@@ -86,9 +91,27 @@ class DigestGenerator:
             diag.update(error="translate step: invalid JSON", latency_s=time.perf_counter() - t0)
             return {"post": None, "post_en": post_en, "diag": diag}
 
-        diag["final_valid"] = not missing_fields(post_it)
         if missing_fields(post_it):
             diag["error"] = "translation step: missing required fields"
+
+        # 4) proofread the Italian (fix grammar/calques only; never content).
+        # On any failure, keep the translated post — it is already valid.
+        diag["proofread"] = False
+        if not missing_fields(post_it):
+            proofed_raw = self._chat(model, P.PROOFREAD_IT, post_it)
+            try:
+                proofed = json.loads(proofed_raw)
+                if not missing_fields(proofed):
+                    post_it = proofed
+                    diag["proofread"] = True
+            except json.JSONDecodeError:
+                pass
+
+        normalize_metals(post_it)
+
+        diag["final_valid"] = not missing_fields(post_it)
+        if missing_fields(post_it):
+            diag["error"] = "missing required fields after proofread"
 
         diag["latency_s"] = time.perf_counter() - t0
         return {"post": post_it, "post_en": post_en, "diag": diag}

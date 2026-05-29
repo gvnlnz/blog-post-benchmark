@@ -1,14 +1,19 @@
 # --- Generation ---
-# Ollama run natively (not in Docker container) so it uses M4 GPU.
-# the QUALITY metrics are identical to production (same model = same text).
-ollama_base_url: "http://localhost:11434/v1"
+# Generation backend, OpenAI-compatible. Now pointed at OpenRouter to benchmark
+# frontier cloud models as an upper-bound reference for the local results.
+# (For a local Ollama run, set gen_base_url back to http://localhost:11434/v1
+#  and remove gen_api_key_env; ollama_host below is only used for RAM reporting.)
+gen_base_url: "https://openrouter.ai/api/v1"
+gen_api_key_env: "OPENROUTER_API_KEY"
 ollama_host: "http://localhost:11434"
 temperature: 0.3   # same used in production LLM
 
-# --- Models ---
+# --- Models under test (generators) ---
+# NOTE: verify the exact OpenRouter slugs at https://openrouter.ai/models
+#       a wrong slug fails fast during warmup.
 models:
-  - "gemma3:4b"
-  - "qwen2.5:7b"
+  - "anthropic/claude-opus-4.8"
+  - "google/gemini-3.1-pro-preview"
 
 # --- Dataset ---
 # A JSON list of {"items": [{"cluster_topic","article":{title,summary,categories}}]}.
@@ -24,6 +29,6 @@ grammar_lang: "it"
 # Keep the judge different from the tested models to avoid self-judging.
 judge:
   enabled: true
-  base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:14b"
-  api_key: "ollama"
+  base_url: "https://openrouter.ai/api/v1"
+  model: "meta-llama/llama-3.3-70b-instruct"
+  api_key_env: "OPENROUTER_API_KEY"
