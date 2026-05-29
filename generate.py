@@ -5,12 +5,36 @@ lingotto_prompts.py so it can be published and run outside the main project.
 Talks to an OpenAI-compatible endpoint (native Ollama on Metal by default).
 """
 import json
+import re
 import time
 
 from openai import OpenAI
 
 import lingotto_prompts as P
 from lingotto_helper import missing_fields, normalize_metals
+
+
+def _loads_lenient(raw: str) -> dict:
+    """Parse a JSON object that may be wrapped in markdown fences or preceded by
+    prose (common with reasoning models, or when a provider strips the
+    response_format hint). Mirrors the judge's tolerant extraction.
+
+    Returns a dict, or raises json.JSONDecodeError if no object can be recovered.
+    """
+    s = raw.strip()
+    if s.startswith("```"):                       # ```json ... ``` or ``` ... ```
+        s = re.sub(r"^```[a-zA-Z]*\s*", "", s)
+        s = re.sub(r"\s*```$", "", s).strip()
+    try:
+        obj = json.loads(s)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"\{.*\}", s, re.DOTALL)         # first {...} block, greedy
+    if m:
+        return json.loads(m.group(0))              # raises if still malformed
+    raise json.JSONDecodeError("no JSON object found", s, 0)
 
 
 class DigestGenerator:
@@ -58,7 +82,7 @@ class DigestGenerator:
         # 1) write digest (English)
         raw = self._chat(model, P.BLOG_DIGEST_PROMPT, {"items": items})
         try:
-            post = json.loads(raw)
+            post = _loads_lenient(raw)
         except json.JSONDecodeError:
             diag.update(error="write step: invalid JSON", latency_s=time.perf_counter() - t0)
             return {"post": None, "post_en": None, "diag": diag}
@@ -74,7 +98,7 @@ class DigestGenerator:
                 "cluster": {"cluster_topic": "daily digest", "articles": articles},
             })
             try:
-                post = json.loads(fixed)
+                post = _loads_lenient(fixed)
             except json.JSONDecodeError:
                 diag.update(error="fix step: invalid JSON", latency_s=time.perf_counter() - t0)
                 return {"post": None, "post_en": None, "diag": diag}
@@ -86,7 +110,7 @@ class DigestGenerator:
         # 3) translate to Italian
         translated = self._chat(model, P.BLOG_TO_IT, post)
         try:
-            post_it = json.loads(translated)
+            post_it = _loads_lenient(translated)
         except json.JSONDecodeError:
             diag.update(error="translate step: invalid JSON", latency_s=time.perf_counter() - t0)
             return {"post": None, "post_en": post_en, "diag": diag}
@@ -100,7 +124,7 @@ class DigestGenerator:
         if not missing_fields(post_it):
             proofed_raw = self._chat(model, P.PROOFREAD_IT, post_it)
             try:
-                proofed = json.loads(proofed_raw)
+                proofed = _loads_lenient(proofed_raw)
                 if not missing_fields(proofed):
                     post_it = proofed
                     diag["proofread"] = True
