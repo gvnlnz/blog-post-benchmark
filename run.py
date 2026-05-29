@@ -30,6 +30,7 @@ SUMMARY_METRICS = [
     "first_pass_valid",       # first English JSON output already had all required fields
     "final_valid",            # final Italian JSON output still has all required fields
     "repaired",               # repair step was needed because the first output was incomplete
+    "proofread",              # Italian proofreading step ran and produced a valid revised post
     "words",                  # word count of the final Italian blog post body
     "grammar_err_per_100w",   # Italian grammar/spelling errors per 100 words
     "gulpease",               # Italian readability index, higher means easier to read
@@ -76,7 +77,10 @@ def main():
     if args.limit_samples is not None:
         data = data[:args.limit_samples]
 
-    gen = DigestGenerator(cfg["ollama_base_url"], temperature=cfg.get("temperature", 0.3))
+    gen_base_url = cfg.get("gen_base_url") or cfg["ollama_base_url"]
+    gen_api_key = os.getenv(cfg.get("gen_api_key_env", ""), "") or "ollama"
+    gen = DigestGenerator(gen_base_url, api_key=gen_api_key,
+                          temperature=cfg.get("temperature", 0.3))
     host = cfg.get("ollama_host", "http://localhost:11434")
 
     grammar = None
@@ -110,6 +114,7 @@ def main():
                     "first_pass_valid": int(diag.get("first_pass_valid", False)),
                     "final_valid": int(diag.get("final_valid", False)),
                     "repaired": int(diag.get("repaired", False)),
+                    "proofread": int(diag.get("proofread", False)),
                     "error": diag.get("error"),
                     "items": len(items),
                 }
