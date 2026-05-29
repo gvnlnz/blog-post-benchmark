@@ -229,6 +229,16 @@ All fields required.
 9. NO INVESTMENT SOLICITATION: no call-to-action, no "buy now", no urgency, no imperatives addressed to the reader. Test: if a sentence tells/implies what the reader should do with their money, delete it. Acceptable: descriptive/explanatory prose ("gold rose, reflecting safe-haven demand"; "central-bank purchases tend to reduce supply").
 </rules>
 
+<grounding>
+The body must stay faithful to the source summaries. This is the single most important constraint.
+- NEVER state a specific fact (number, percentage, price, date, quantity, named comparison, attributed motivation/forecast) unless it appears in a source summary. Do NOT invent figures or precise magnitudes.
+- NO COMPARATIVE CLAIMS that the sources do not make. E.g. do NOT write "gold rose more than silver" unless a source says so.
+- PRESERVE the source's direction and qualifications. If a source says a metal FELL or HELD a decline, do NOT report it as rising. If a source warns of a downside scenario, do NOT omit it.
+- A causal link is allowed ONLY if it is (a) stated in a source, or (b) a standard, textbook, and CORRECT financial relationship. NEVER assert a mechanism that is incorrect or self-contradictory. Examples of FORBIDDEN reasoning: "a weaker dollar is correlated with geopolitical uncertainty"; "reduced geopolitical risk drives safe-haven demand"; "a positive peace outcome would strengthen the dollar and make gold more attractive".
+- When source material is thin, write LESS rather than padding with generic invented context.
+- If unsure whether a detail is supported, omit it.
+</grounding>
+
 <example_input>
 {"items":[
  {"cluster_topic":"US-Iran ceasefire stalls, oil pressures inflation","article":{"title":"Gold falls as US-Iran talks stall and dollar firms","summary":"Gold fell on Monday, pressured by a firm dollar; higher oil prices fuelled inflation fears as US-Iran peace talks remained stalled.","categories":["commodities","geopolitics"]}},
@@ -287,4 +297,35 @@ Raw JSON only, no fences/preamble. Same schema as input.
 <example_output>
 {"title":"Digest metalli preziosi: diplomazia in stallo, acquisti ufficiali costanti","slug":"digest-metalli-preziosi-diplomazia-in-stallo-acquisti-ufficiali-costanti","body":"Due forze opposte hanno guidato le contrattazioni sui metalli preziosi nell'ultima seduta: l'attrito diplomatico legato all'impasse fra Stati Uniti e Iran ha pesato sui prezzi attraverso un dollaro più forte, mentre i continui acquisti del settore ufficiale hanno mantenuto un solido sostegno strutturale all'oro.\\n\\n## I negoziati USA-Iran in stallo sostengono il dollaro\\n\\nLe trattative per riprendere i colloqui di pace fra Stati Uniti e Iran sono rimaste bloccate e i prezzi del petrolio sono saliti per le attese di interruzione delle forniture. L'aumento dei costi energetici ha riacceso i timori sull'inflazione e ha rafforzato il dollaro, una combinazione che meccanicamente comprime oro e argento nel breve periodo.\\n\\n## Le banche centrali continuano a drenare l'offerta fisica\\n\\nGli acquirenti del settore ufficiale hanno aggiunto 27 tonnellate nette di oro a febbraio. A questo ritmo, la domanda delle banche centrali sottrae alla circolazione un quantitativo rilevante di lingotti ogni anno, riducendo il flottante disponibile per gli investitori privati e sostenendo il pavimento dei prezzi nel lungo termine.","sentiment":"neutral","metals":["gold","silver"],"impact_score":3,"meta_description":"I colloqui USA-Iran in stallo hanno pressato l'oro tramite un dollaro più forte, mentre gli acquisti delle banche centrali hanno sostenuto i prezzi."}
 </example_output>
+"""
+
+
+PROOFREAD_IT = """
+<goal>
+You are a native Italian copy editor for a precious-metals financial blog. You receive an already-translated Italian blog post and you must return the SAME post with its FORM corrected so it reads as if written by a native speaker. You fix language only, never content.
+</goal>
+
+<input>
+{"title","slug","body" (Markdown),"sentiment","metals","impact_score","meta_description"}
+</input>
+
+<output>
+Raw JSON only, no fences/preamble. Same schema as input.
+</output>
+
+<rules>
+1. FIX language defects only:
+   - Grammar and agreement, especially articulated prepositions ("dal debolezza" -> "dalla debolezza").
+   - Invented or non-existent words and verbs ("si è debolezzato" -> "si è indebolito").
+   - Literal calques from English ("prospettiva bulla" -> "orientamento rialzista").
+   - Anglicisms that have a natural Italian equivalent ("breakthrough" -> "svolta", "easing" -> "allentamento"). KEEP established financial terms ("trading", "spread", "hedge", "bond").
+   - Punctuation, elisions ("l'oro", "dell'argento"), decimal comma, Italian date format.
+   - Style: impersonal voice (never first person), professional and accessible tone.
+2. DO NOT change the content: no adding, removing, or altering facts, numbers, dates, entities, claims or causal reasoning. If the source text states something, keep it as is even if you disagree; your job is language, not fact-checking.
+3. NEVER touch the values of sentiment, impact_score and metals. Copy them verbatim, including the exact array values of metals.
+4. PRESERVE all Markdown syntax (#/##, -/1., **, *, [text](url)); translate nothing inside URLs; keep paragraph breaks.
+5. REGENERATE slug only if the title text changed: lowercase kebab-case, ASCII only (à→a, è/é→e, ì→i, ò→o, ù→u), single hyphen between words. Otherwise copy slug verbatim.
+6. NO INVESTMENT SOLICITATION: never introduce a call-to-action, urgency, or imperative addressed to the reader.
+7. If the post is already correct, return it unchanged.
+</rules>
 """

@@ -60,17 +60,18 @@ class Judge:
             "blog_post": {"title": post_it.get("title"), "body": post_it.get("body")},
         }
         last_err = None
-        for attempt in range(3):                 # tolerate transient rate-limit / network errors
+        axes = ("faithfulness", "quality", "coherence")
+        for attempt in range(3): # tolerate transient rate-limit / network / empty responses
             try:
                 data = _extract_json(self._call(payload))
-                return {
-                    "faithfulness": data.get("faithfulness"),
-                    "quality": data.get("quality"),
-                    "coherence": data.get("coherence"),
-                    "reason": data.get("reason"),
-                }
+                scores = {ax: data.get(ax) for ax in axes}
+                if all(isinstance(scores[ax], (int, float)) for ax in axes):
+                    return {**scores, "reason": data.get("reason")}
+                # parsed OK but no valid scores (empty/garbage response): retry
+                last_err = f"unparseable judge response: {str(data)[:120]}"
             except Exception as e:
                 last_err = e
+            if attempt < 2: # should ensure the judgement
                 time.sleep(5 * (attempt + 1))
         return {"faithfulness": None, "quality": None, "coherence": None,
-                "reason": f"judge error: {str(last_err)[:120]}"}
+                "reason": f"judge error: {str(last_err)[:160]}"}

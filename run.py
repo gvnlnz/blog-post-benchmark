@@ -30,6 +30,7 @@ SUMMARY_METRICS = [
     "first_pass_valid",       # first English JSON output already had all required fields
     "final_valid",            # final Italian JSON output still has all required fields
     "repaired",               # repair step was needed because the first output was incomplete
+    "proofread",              # Italian proofreading step ran and produced a valid revised post
     "words",                  # word count of the final Italian blog post body
     "grammar_err_per_100w",   # Italian grammar/spelling errors per 100 words
     "gulpease",               # Italian readability index, higher means easier to read
@@ -60,8 +61,14 @@ def build_judge(jc: dict | None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=str(CWD / "config.yaml"))
-    ap.add_argument("--limit-samples", type=int, default=None,
+    ap.add_argument("--config", 
+                    default=str(CWD / "config.yaml"),
+                    type=str,
+                    help="path to the config file")
+    
+    ap.add_argument("--limit-samples", 
+                    default=None,
+                    type=int, 
                     help="optional quick run limit without editing the dataset")
     args = ap.parse_args()
 
@@ -76,7 +83,10 @@ def main():
     if args.limit_samples is not None:
         data = data[:args.limit_samples]
 
-    gen = DigestGenerator(cfg["ollama_base_url"], temperature=cfg.get("temperature", 0.3))
+    gen_base_url = cfg.get("gen_base_url") or cfg["ollama_base_url"]
+    gen_api_key = os.getenv(cfg.get("gen_api_key_env", ""), "") or "ollama"
+    gen = DigestGenerator(gen_base_url, api_key=gen_api_key,
+                          temperature=cfg.get("temperature", 0.3))
     host = cfg.get("ollama_host", "http://localhost:11434")
 
     grammar = None
@@ -97,7 +107,7 @@ def main():
     raw_path = output_dir / "raw.jsonl"
     with open(raw_path, "w") as raw_f:
         for model in cfg["models"]:
-            print(f"\n=== {model} ===")
+            print(f"\n ----- {model} -----")
             gen.warmup(model)
             for i, entry in enumerate(data):
                 items = entry["items"]
@@ -110,6 +120,7 @@ def main():
                     "first_pass_valid": int(diag.get("first_pass_valid", False)),
                     "final_valid": int(diag.get("final_valid", False)),
                     "repaired": int(diag.get("repaired", False)),
+                    "proofread": int(diag.get("proofread", False)),
                     "error": diag.get("error"),
                     "items": len(items),
                 }
@@ -119,7 +130,7 @@ def main():
                         row.update(judge.score(items, post))
                 rows.append(row)
                 raw_f.write(json.dumps({"row": row, "post": post}, ensure_ascii=False) + "\n")
-                print(f"  sample {i}: lat={row['latency_s']}s valid={row['first_pass_valid']} "
+                print(f"\tsample {i}: lat={row['latency_s']}s valid={row['first_pass_valid']} "
                       f"gulp={row.get('gulpease')} gram={row.get('grammar_err_per_100w')} "
                       f"faith={row.get('faithfulness')} qual={row.get('quality')}")
 
