@@ -61,8 +61,14 @@ def build_judge(jc: dict | None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=str(CWD / "config.yaml"))
-    ap.add_argument("--limit-samples", type=int, default=None,
+    ap.add_argument("--config", 
+                    default=str(CWD / "config.yaml"),
+                    type=str,
+                    help="path to the config file")
+    
+    ap.add_argument("--limit-samples", 
+                    default=None,
+                    type=int, 
                     help="optional quick run limit without editing the dataset")
     args = ap.parse_args()
 
@@ -101,7 +107,7 @@ def main():
     raw_path = output_dir / "raw.jsonl"
     with open(raw_path, "w") as raw_f:
         for model in cfg["models"]:
-            print(f"\n=== {model} ===")
+            print(f"\n ----- {model} -----")
             gen.warmup(model)
             for i, entry in enumerate(data):
                 items = entry["items"]
@@ -124,7 +130,7 @@ def main():
                         row.update(judge.score(items, post))
                 rows.append(row)
                 raw_f.write(json.dumps({"row": row, "post": post}, ensure_ascii=False) + "\n")
-                print(f"  sample {i}: lat={row['latency_s']}s valid={row['first_pass_valid']} "
+                print(f"\tsample {i}: lat={row['latency_s']}s valid={row['first_pass_valid']} "
                       f"gulp={row.get('gulpease')} gram={row.get('grammar_err_per_100w')} "
                       f"faith={row.get('faithfulness')} qual={row.get('quality')}")
 
