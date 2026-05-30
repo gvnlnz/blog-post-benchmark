@@ -1,0 +1,3 @@
+model,n,latency_s,ram_mb,first_pass_valid,final_valid,repaired,proofread,words,grammar_err_per_100w,gulpease,repetition_3gram,faithfulness,quality,coherence
+gemma3:4b,19,55.17,4311.4,1,0.95,0,0.95,251.44,1.50,46.25,0.05,5,4.29,5
+qwen2.5:7b,19,112.76,4924.2,0.95,0.89,0,0.89,279.28,1.74,45.18,0.06,4.94,4.29,5

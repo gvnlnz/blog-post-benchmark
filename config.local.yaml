@@ -1,0 +1,31 @@
+# --- Final run: LOCAL generators judged by the SAME cloud judge as the API run ---
+# Goal: make the local run fully comparable to the cloud run by using the same
+# 4-step pipeline (write -> fix -> translate -> proofread) AND the same judge
+# (llama-3.3-70b via OpenRouter). This removes the "different judge" and
+# "different pipeline" cross-run caveats.
+
+# --- Generation: local Ollama (OpenAI-compatible) ---
+gen_base_url: "http://localhost:11434/v1"
+# no gen_api_key_env: local Ollama needs no key (the client sends a dummy one).
+ollama_host: "http://localhost:11434"   # used for RAM-footprint reporting
+temperature: 0.3                        # same as production / other runs
+
+# --- Models under test (local generators) ---
+models:
+  - "gemma3:4b"
+  - "qwen2.5:7b"
+
+# --- Dataset ---
+dataset: "data/clusters.json"
+output_dir: "results"
+
+# --- Deterministic grammar check (LanguageTool / Java) ---
+grammar: true
+grammar_lang: "it"
+
+# --- LLM-as-judge: cloud llama-3.3-70b via OpenRouter (same as the API run) ---
+judge:
+  enabled: true
+  base_url: "https://openrouter.ai/api/v1"
+  model: "meta-llama/llama-3.3-70b-instruct"
+  api_key_env: "OPENROUTER_API_KEY"
