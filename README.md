@@ -27,6 +27,7 @@ It then produces a compact `model x metrics` table with readability, grammar, fa
 | `anthropic/claude-opus-4.8` | cloud | 19 | 32.13 | n/a | 1.00 | 1.00 | 1.00 | 293.84 | 0.99 | 47.76 | 0.05 | 5.00 | 4.42 | 5.00 |
 | `google/gemini-3.1-pro-preview` | cloud | 19 | 134.27 | n/a | 1.00 | 0.95 | 0.84 | 489.83 | 1.14 | 42.48 | 0.03 | 4.94 | 5.00 | 5.00 |
 
+For more details, see [results.md](results.md).
 
 Two benchmark setups have been run:
 
