@@ -20,11 +20,12 @@ It then produces a compact `model x metrics` table with readability, grammar, fa
 
 Two benchmark setups have been run:
 
-- **Local (Ollama):** generation models `gemma3:4b`, `qwen2.5:7b`; judge `qwen2.5:14b`; runtime. Ollama local API on an Apple Silicon machine.
-- **Cloud (OpenRouter):** generation models `anthropic/claude-opus-4.8`, `google/gemini-3 1-pro-preview`; judge `meta-llama/llama-3.3-70b-instruct`.
+- **Local run**: generation models `gemma3:4b` and `qwen2.5:7b`, run via the Ollama local API on Apple Silicon.
+- **Cloud run**: frontier generation models `anthropic/claude-opus-4.8` and `google/gemini-3.1-pro-preview`, run via OpenRouter.
+- **Judge**: both runs are scored by an independent judge `meta-llama/llama-3.3-70b-instruct`.
 
 The cloud run serves as a frontier upper-bound reference for the local results.
-Switch between the two by editing `config.yaml` (see *Configuration* below).
+The two configurations are available in `config.yaml` and `local.config.yaml` (see *Configuration* below).
 
 ## Why This Exists
 
@@ -83,7 +84,8 @@ meaningful for local Ollama models and is left empty for cloud API models.
 ## Project Structure
 
 ```text
-├── config.yaml               # main benchmark configuration
+├── config.yaml               # cloud benchmark configuration
+├── local.config.yaml.        # local benchmark configuration
 ├── requirements.txt
 ├── results/
 │   ├── api-models-summary.csv  # mean metrics per cloud model
@@ -97,8 +99,7 @@ meaningful for local Ollama models and is left empty for cloud API models.
 ├── lingotto_prompts.py       # vendored production prompts (digest/fix/translate/proofread)
 ├── metrics.py                # deterministic text metrics
 ├── results.md                # local-vs-cloud result analysis
-├── run.py                    # benchmark orchestrator
-└── smoke.yaml                # quick plumbing test configuration
+└── run.py                    # benchmark orchestrator
 ```
 
 ## Requirements (using Homebrew)
@@ -139,13 +140,13 @@ brew install openjdk
 java -version
 ```
 
-If Java is not available, set `grammar: false` in `config.yaml`.
+If Java is not available, set `grammar: false` in conf files.
 
 ## Configuration
 
-Select the backend, models and options in `config.yaml`.
+Switch between `config.yaml` and `local.config.yaml`.
 
-**Cloud setup (frontier reference, current default):**
+**Cloud setup**
 
 ```yaml
 gen_base_url: "https://openrouter.ai/api/v1"
@@ -168,7 +169,7 @@ judge:
   api_key_env: "OPENROUTER_API_KEY"
 ```
 
-**Local setup (Ollama):**
+**Local setup (Ollama)**
 
 ```yaml
 gen_base_url: "http://localhost:11434/v1"
@@ -187,7 +188,7 @@ grammar: true
 judge:
   enabled: true
   base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:14b"
+  model: "meta-llama/llama-3.3-70b-instruct"
   api_key: "ollama"
 ```
 
@@ -203,12 +204,6 @@ Check dataset size:
 
 ```bash
 python inspect_dataset.py data/clusters.json
-```
-
-Run a smoke test:
-
-```bash
-python run.py --config smoke.yaml
 ```
 
 Run a short timing check:
@@ -243,36 +238,6 @@ documented in:
 ```text
 results.md
 ```
-
-## Building A Dataset
-
-You can use the included `data/clusters.json`, or build a new frozen dataset
-from a MySQL database containing articles.
-
-Required environment variables:
-
-```env
-WEBSITE_DB_HOST=127.0.0.1
-WEBSITE_MYSQL_PORT=3308
-WEBSITE_MYSQL_USER=website_user
-WEBSITE_MYSQL_PASSWORD=
-WEBSITE_MYSQL_DATABASE=website_db
-```
-
-Build a dataset from roughly 400 articles:
-
-```bash
-python build_dataset.py \
-  --limit 400 \
-  --since 2026-03-01 \
-  --batch-size 15 \
-  --model qwen2.5:14b
-```
-
-The builder reads articles, groups them into batches, creates thematic clusters,
-selects the best article for each cluster and writes a frozen benchmark dataset.
-Use a strong, consistent model for this step: dataset creation is separate from
-the writing-model comparison.
 
 ## Methodological Scope
 
