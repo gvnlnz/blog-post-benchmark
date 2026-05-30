@@ -18,6 +18,16 @@ After it, a deterministic `normalize_metals()` step canonicalizes the `metals` a
 
 It then produces a compact `model x metrics` table with readability, grammar, faithfulness, editorial quality, coherence, structural validity and performance statistics.
 
+## Results 
+
+| Model | Environment | n | Latency (s) | RAM (MB) | First valid | Final valid | Proofread | Words | Grammar err/100w | Gulpease | Repetition | Faithfulness | Quality | Coherence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `gemma3:4b` | local | 19 | 55.17 | 4311.4 | 1.00 | 0.95 | 0.95 | 251.44 | 1.50 | 46.25 | 0.05 | 5.00 | 4.29 | 5.00 |
+| `qwen2.5:7b` | local | 19 | 112.76 | 4924.2 | 0.95 | 0.89 | 0.89 | 279.28 | 1.74 | 45.18 | 0.06 | 4.94 | 4.29 | 5.00 |
+| `anthropic/claude-opus-4.8` | cloud | 19 | 32.13 | n/a | 1.00 | 1.00 | 1.00 | 293.84 | 0.99 | 47.76 | 0.05 | 5.00 | 4.42 | 5.00 |
+| `google/gemini-3.1-pro-preview` | cloud | 19 | 134.27 | n/a | 1.00 | 0.95 | 0.84 | 489.83 | 1.14 | 42.48 | 0.03 | 4.94 | 5.00 | 5.00 |
+
+
 Two benchmark setups have been run:
 
 - **Local run**: generation models `gemma3:4b` and `qwen2.5:7b`, run via the Ollama local API on Apple Silicon.
